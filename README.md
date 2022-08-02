@@ -1,4 +1,5 @@
 ## .env 
 ```
 BOOTSTRAP-SERVER=
+TOPIC=
 ```
