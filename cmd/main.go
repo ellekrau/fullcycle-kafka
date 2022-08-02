@@ -10,21 +10,33 @@ import (
 )
 
 func main() {
-	// Load .env
+	// Loads .env file
 	godotenv.Load("../.env")
 
-	// Start kafka producer
+	// Starts the kafka producer
 	producer, err := newKafkaProducer()
 	if err != nil {
 		log.Fatalln(fmt.Errorf("kafka producer creation error: %s", err.Error()))
 	}
 
-	// Send kafka message
-	err = produceKafkaMessage(nil, "Hello world!", os.Getenv("TOPIC"), producer)
-	producer.Flush(10000)
+	// Sends kafka message using flush
+	err = produceKafkaMessage(nil, "Message with flush!", os.Getenv("TOPIC"), producer, nil)
+	producer.Flush(1000)
 	if err != nil {
 		log.Fatalln(fmt.Errorf("kakfa produce message error: %s", err.Error()))
 	}
+
+	// Sends a kafka message using delivery channel
+	deliveryChannel := make(chan kafka.Event)
+	err = produceKafkaMessage(nil, "Message with delivery channel!", os.Getenv("TOPIC"), producer, deliveryChannel)
+
+	// Receives the kafka message response sent to deliveryChannel
+	sentMessage := (<-deliveryChannel).(*kafka.Message)
+	if err = sentMessage.TopicPartition.Error; err != nil {
+		log.Fatalln(fmt.Errorf("send kafka message error: %s", err.Error()))
+	}
+
+	log.Printf("message was successfully sent to '%s'", sentMessage.TopicPartition)
 }
 
 func newKafkaProducer() (producer *kafka.Producer, err error) {
@@ -35,7 +47,7 @@ func newKafkaProducer() (producer *kafka.Producer, err error) {
 	return
 }
 
-func produceKafkaMessage(key []byte, message string, topic string, producer *kafka.Producer) (err error) {
+func produceKafkaMessage(key []byte, message string, topic string, producer *kafka.Producer, deliveryChannel chan kafka.Event) (err error) {
 	kafkaMessage := &kafka.Message{
 		TopicPartition: kafka.TopicPartition{
 			Topic:     &topic,
@@ -45,6 +57,6 @@ func produceKafkaMessage(key []byte, message string, topic string, producer *kaf
 		Key:       key,
 		Timestamp: time.Now(),
 	}
-	err = producer.Produce(kafkaMessage, nil)
+	err = producer.Produce(kafkaMessage, deliveryChannel)
 	return
 }
