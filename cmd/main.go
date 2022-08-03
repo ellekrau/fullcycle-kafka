@@ -31,12 +31,13 @@ func main() {
 	err = produceKafkaMessage(nil, "Message with delivery channel!", os.Getenv("TOPIC"), producer, deliveryChannel)
 
 	// Receives the kafka message response sent to deliveryChannel
-	sentMessage := (<-deliveryChannel).(*kafka.Message)
-	if err = sentMessage.TopicPartition.Error; err != nil {
-		log.Fatalln(fmt.Errorf("send kafka message error: %s", err.Error()))
-	}
+	//sentMessage := (<-deliveryChannel).(*kafka.Message)
+	//if err = sentMessage.TopicPartition.Error; err != nil {
+	//	log.Fatalln(fmt.Errorf("send kafka message error: %s", err.Error()))
+	//}
 
-	log.Printf("message was successfully sent to '%s'", sentMessage.TopicPartition)
+	go runKafkaMessageDeliveryReport(deliveryChannel)
+	producer.Flush(1000)
 }
 
 func newKafkaProducer() (producer *kafka.Producer, err error) {
@@ -59,4 +60,16 @@ func produceKafkaMessage(key []byte, message string, topic string, producer *kaf
 	}
 	err = producer.Produce(kafkaMessage, deliveryChannel)
 	return
+}
+
+func runKafkaMessageDeliveryReport(deliveryChan chan kafka.Event) {
+	for event := range deliveryChan {
+		switch event.(type) {
+		case *kafka.Message:
+			if err := event.(*kafka.Message).TopicPartition.Error; err != nil {
+				log.Fatalln(fmt.Errorf("send kafka message error: %s", err.Error()))
+			}
+			log.Printf("message was successfully sent to '%s'", event.(*kafka.Message).TopicPartition)
+		}
+	}
 }
