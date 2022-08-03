@@ -20,15 +20,23 @@ func main() {
 	}
 
 	// Sends kafka message using flush
-	err = produceKafkaMessage(nil, "Message with flush!", os.Getenv("TOPIC"), producer, nil)
-	producer.Flush(1000)
-	if err != nil {
-		log.Fatalln(fmt.Errorf("kakfa produce message error: %s", err.Error()))
-	}
+	//err = produceKafkaMessage(nil, fmt.Sprint("Message with flush! ", time.Now().UnixMicro()), os.Getenv("TOPIC"), producer, nil)
+	//producer.Flush(1000)
+	//if err != nil {
+	//	log.Fatalln(fmt.Errorf("kakfa produce message error: %s", err.Error()))
+	//}
+
+	deliveryChannel := make(chan kafka.Event)
+	go runKafkaMessageDeliveryReport(deliveryChannel)
 
 	// Sends a kafka message using delivery channel
-	deliveryChannel := make(chan kafka.Event)
-	err = produceKafkaMessage(nil, "Message with delivery channel!", os.Getenv("TOPIC"), producer, deliveryChannel)
+	for {
+		err = produceKafkaMessage(nil, fmt.Sprint("Message ", time.Now().UnixMicro()), os.Getenv("TOPIC"), producer, deliveryChannel)
+		if err != nil {
+			log.Fatalln(fmt.Errorf("send kafka message error: %s", err.Error()))
+		}
+		producer.Flush(1000)
+	}
 
 	// Receives the kafka message response sent to deliveryChannel
 	//sentMessage := (<-deliveryChannel).(*kafka.Message)
@@ -37,10 +45,9 @@ func main() {
 	//}
 
 	// Sends a kafka message using delivery channel and key to be consumed by the same consumer
-	err = produceKafkaMessage([]byte("1"), "Message with delivery channel and key!", os.Getenv("TOPIC"), producer, deliveryChannel)
+	//err = produceKafkaMessage([]byte("1"), fmt.Sprint("Message with delivery channel and key! ", time.Now().UnixMicro()), os.Getenv("TOPIC"), producer, deliveryChannel)
 
 	// Async consume of delivery channel
-	go runKafkaMessageDeliveryReport(deliveryChannel)
 	producer.Flush(1000)
 }
 
